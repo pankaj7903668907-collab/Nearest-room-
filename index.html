@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>NearestRoom - Find Rooms Near You</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f0f2f5;
+            padding-bottom: 80px;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .shadow-card {
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .shadow-card:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            transform: translateY(-3px);
+        }
+        .bottom-nav {
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 6px 0 env(safe-area-inset-bottom);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #9ca3af;
+            transition: color 0.2s;
+            padding: 4px 12px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            gap: 2px;
+            min-width: 56px;
+        }
+        .bottom-nav-item.active {
+            color: #2563eb;
+        }
+        .bottom-nav-item i {
+            font-size: 22px;
+        }
+        .room-card-img {
+            height: 200px;
+            object-fit: cover;
+            width: 100%;
+        }
+        .facility-badge {
+            background: #f3f4f6;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: #374151;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .facility-badge i {
+            font-size: 12px;
+        }
+        .step-indicator {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .step-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            transition: all 0.3s;
+        }
+        .step-dot.active {
+            background: #2563eb;
+            color: white;
+        }
+        .step-dot.completed {
+            background: #10b981;
+            color: white;
+        }
+        .upload-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+        .upload-zone:hover {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        .upload-zone.dragover {
+            border-color: #2563eb;
+            background: #dbeafe;
+        }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.3s;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+            animation: slideUp 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .image-thumb {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #e5e7eb;
+        }
+        .image-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .image-thumb .remove-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 300;
+            padding: 16px 24px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 500;
+            max-width: 400px;
+            animation: slideIn 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+        .toast.info { background: #3b82f6; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .message-bubble {
+            max-width: 80%;
+            padding: 10px 16px;
+            border-radius: 16px;
+            margin: 4px 0;
+        }
+        .message-bubble.sent {
+            background: #2563eb;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .message-bubble.received {
+            background: #f3f4f6;
+            color: #1f2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .logo-text {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+        }
+        .logo-icon {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            border-radius: 12px;
+            padding: 6px 8px;
+            color: white;
+            font-size: 20px;
+        }
+        @media (max-width: 640px) {
+            .bottom-nav-item span { display: none; }
+            .bottom-nav-item { min-width: 44px; padding: 4px 8px; }
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c7cd; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8b0b8; }
+    </style>
+</head>
+<body>
+
+<!-- ===== APP CONTAINER ===== -->
+<div id="app" class="max-w-4xl mx-auto px-4 pb-20">
+
+    <!-- ===== HEADER ===== -->
+    <header class="glass sticky top-0 z-40 py-3 px-4 -mx-4 mb-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <div class="logo-icon">
+                <i class="fas fa-home"></i>
+            </div>
+            <span class="text-2xl font-extrabold logo-text">NearestRoom</span>
+            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Beta</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="toggleTheme()" class="text-gray-600 hover:text-blue-600 text-xl">
+                <i class="fas fa-moon"></i>
+            </button>
+            <button onclick="showAuthModal()" class="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition">
+                <i class="fas fa-user mr-1"></i> Sign In
+            </button>
+        </div>
+    </header>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <div id="mainContent">
+        <!-- Home Page -->
+        <div id="homePage">
+            <!-- Tagline -->
+            <div class="text-center mb-4">
+                <h1 class="text-2xl font-bold text-gray-800">🏠 Find Rooms Near You</h1>
+                <p class="text-gray-500 text-sm">Students • Workers • Bachelors • Everyone</p>
+            </div>
+
+            <!-- Search -->
+            <div class="bg-white rounded-2xl shadow-card p-4 mb-4">
+                <div class="flex gap-2">
+                    <div class="flex-1 relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="searchInput" placeholder="Where do you want to stay?" 
+                               class="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition" />
+                    </div>
+                    <button onclick="getLocation()" class="bg-blue-50 text-blue-600 px-4 py-3 rounded-xl hover:bg-blue-100 transition whitespace-nowrap">
+                        <i class="fas fa-location-dot mr-1"></i> Near Me
+                    </button>
+                </div>
+                <div id="locationStatus" class="text-xs text-gray-500 mt-2"></div>
+            </div>
+
+            <!-- Filter Chips -->
+            <div class="flex gap-2 overflow-x-auto pb-3 mb-3 scrollbar-hide">
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="all">
+                    <i class="fas fa-list mr-1"></i> All
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="single">
+                    <i class="fas fa-user mr-1"></i> Single
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="shared">
+                    <i class="fas fa-users mr-1"></i> Shared
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="pg">
+                    <i class="fas fa-building mr-1"></i> PG
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="bhk">
+                    <i class="fas fa-home mr-1"></i> BHK
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="wifi">
+                    <i class="fas fa-wifi mr-1"></i> Wi-Fi
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="ac">
+                    <i class="fas fa-snowflake mr-1"></i> AC
+                </button>
+                <button class="filter-chip px-4 py-2 bg-white rounded-full shadow-sm text-sm whitespace-nowrap hover:bg-gray-50 transition" data-filter="food">
+                    <i class="fas fa-utensils mr-1"></i> Food
+                </button>
+            </div>
+
+            <!-- Rooms Grid -->
+            <div id="roomsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Rooms will be rendered here -->
+            </div>
+            
+            <!-- Load More -->
+            <div class="text-center py-6">
+                <button onclick="loadMoreRooms()" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    <i class="fas fa-chevron-down mr-1"></i> Load More
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Page (Hidden) -->
+        <div id="searchPage" class="hidden">
+            <div class="bg-white rounded-2xl shadow-card p-4 mb-4">
+                <h3 class="font-semibold text-lg mb-3"><i class="fas fa-sliders-h text-blue-500 mr-2"></i>Advanced Filters</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" placeholder="Min Rent" id="minRent" class="border rounded-lg px-3 py-2 text-sm" />
+                    <input type="number" placeholder="Max Rent" id="maxRent" class="border rounded-lg px-3 py-2 text-sm" />
+                    <select id="roomTypeFilter" class="border rounded-lg px-3 py-2 text-sm">
+                        <option value="">All Types</option>
+                        <option value="single">Single Room</option>
+                        <option value="double">Double Sharing</option>
+                        <option value="triple">Triple Sharing</option>
+                        <option value="pg">PG</option>
+                        <option value="1bhk">1 BHK</option>
+                        <option value="2bhk">2 BHK</option>
+                    </select>
+                    <select id="waterFilter" class="border rounded-lg px-3 py-2 text-sm">
+                        <option value="">Water Availability</option>
+                        <option value="24×7">24×7</option>
+                        <option value="Morning">Morning/Evening</option>
+                        <option value="Limited">Limited Hours</option>
+                    </select>
+                </div>
+                <div class="flex gap-2 mt-3 flex-wrap">
+                    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="fWifi" /> Wi-Fi</label>
+                    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="fAc" /> AC</label>
+                    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="fParking" /> Parking</label>
+                    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="fKitchen" /> Kitchen</label>
+                    <label class="flex items-center gap-1 text-sm"><input type="checkbox" id="fFood" /> Food</label>
+                </div>
+                <button onclick="applyFilters()" class="w-full mt-3 bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition">
+                    <i class="fas fa-sliders mr-1"></i> Apply Filters
+                </button>
+            </div>
+            <div id="searchResults" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- Saved Page (Hidden) -->
+        <div id="savedPage" class="hidden">
+            <h2 class="text-xl font-bold mb-4"><i class="fas fa-heart text-red-500 mr-2"></i> Saved Rooms</h2>
+            <div id="savedGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- Messages Page (Hidden) -->
+        <div id="messagesPage" class="hidden">
+            <h2 class="text-xl font-bold mb-4"><i class="fas fa-comment-dots text-blue-500 mr-2"></i> Messages</h2>
+            <div id="conversationsList" class="space-y-3"></div>
+            <div id="chatView" class="hidden">
+                <div class="bg-white rounded-2xl shadow-card p-4">
+                    <div class="flex items-center gap-3 border-b pb-3 mb-3">
+                        <button onclick="closeChat()" class="text-gray-500"><i class="fas fa-arrow-left text-xl"></i></button>
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold"></div>
+                        <div>
+                            <div class="font-semibold" id="chatPartnerName">Owner Name</div>
+                            <div class="text-xs text-green-500">● Online</div>
+                        </div>
+                    </div>
+                    <div id="chatMessages" class="space-y-2 max-h-96 overflow-y-auto mb-4 flex flex-col"></div>
+                    <div class="flex gap-2">
+                        <input type="text" id="chatInput" placeholder="Type a message..." 
+                               class="flex-1 border rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500" />
+                        <button onclick="sendMessage()" class="bg-blue-600 text-white px-6 py-2 rounded-xl hover:bg-blue-700 transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Page (Hidden) -->
+        <div id="profilePage" class="hidden">
+            <div class="bg-white rounded-2xl shadow-card p-6 text-center">
+                <div class="w-24 h-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
+                    G
+                </div>
+                <h3 class="text-xl font-bold" id="profileName">Guest User</h3>
+                <p class="text-gray-500 text-sm" id="profileEmail">Not signed in</p>
+                <div class="mt-4 flex justify-center gap-4">
+                    <span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs">🔓 Not Verified</span>
+                </div>
+                <div class="mt-6 space-y-3">
+                    <button onclick="showAuthModal()" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition">
+                        <i class="fas fa-sign-in-alt mr-2"></i> Sign In
+                    </button>
+                    <button onclick="showOwnerDashboard()" class="w-full bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 transition">
+                        <i class="fas fa-building mr-2"></i> Owner Dashboard
+                    </button>
+                    <button onclick="showAdminPanel()" class="w-full bg-red-50 text-red-600 py-3 rounded-xl hover:bg-red-100 transition">
+                        <i class="fas fa-shield mr-2"></i> Admin Panel
+                    </button>
+                </div>
+                <div class="mt-4 text-xs text-gray-400">
+                    <p>🔒 Your privacy is protected</p>
+                    <p>📍 Approximate location only</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== BOTTOM NAVIGATION ===== -->
+    <nav class="bottom-nav">
+        <button class="bottom-nav-item active" data-page="home" onclick="navigateTo('home')">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </button>
+        <button class="bottom-nav-item" data-page="search" onclick="navigateTo('search')">
+            <i class="fas fa-search"></i>
+            <span>Search</span>
+        </button>
+        <button class="bottom-nav-item" data-page="saved" onclick="navigateTo('saved')">
+            <i class="fas fa-heart"></i>
+            <span>Saved</span>
+            <span id="savedBadge" class="hidden bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 -mt-1">0</span>
+        </button>
+        <button class="bottom-nav-item" data-page="messages" onclick="navigateTo('messages')">
+            <i class="fas fa-comment-dots"></i>
+            <span>Messages</span>
+            <span id="msgBadge" class="hidden bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 -mt-1">0</span>
+        </button>
+        <button class="bottom-nav-item" data-page="profile" onclick="navigateTo('profile')">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </button>
+    </nav>
+
+    <!-- ===== AUTH MODAL ===== -->
+    <div id="authModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold" id="authTitle">Sign In</h2>
+                <button onclick="closeAuthModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div id="authForms">
+                <!-- Login Form -->
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="space-y-3">
+                        <input type="email" placeholder="Email" required class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                        <input type="password" placeholder="Password" required class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium">
+                            Sign In
+                        </button>
+                        <p class="text-center text-sm text-gray-500">
+                            Don't have an account? 
+                            <button type="button" onclick="switchAuthForm('signup')" class="text-blue-600 hover:underline">Sign Up</button>
+                        </p>
+                    </div>
+                </form>
+                <!-- Signup Form -->
+                <form id="signupForm" onsubmit="handleSignup(event)" class="hidden">
+                    <div class="space-y-3">
+                        <input type="text" placeholder="Full Name" required class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                        <input type="email" placeholder="Email" required class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                        <input type="password" placeholder="Password (min 6 chars)" required minlength="6" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                        <select required class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500">
+                            <option value="">I am a...</option>
+                            <option value="tenant">Tenant - Looking for a room</option>
+                            <option value="owner">Owner - Listing a room</option>
+                        </select>
+                        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium">
+                            Create Account
+                        </button>
+                        <p class="text-center text-sm text-gray-500">
+                            Already have an account? 
+                            <button type="button" onclick="switchAuthForm('login')" class="text-blue-600 hover:underline">Sign In</button>
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ROOM DETAIL MODAL ===== -->
+    <div id="roomDetailModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="flex justify-between items-start mb-4">
+                <button onclick="closeRoomDetail()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                <button onclick="toggleSave()" class="text-2xl text-gray-400 hover:text-red-500 transition" id="saveBtn">
+                    <i class="far fa-heart"></i>
+                </button>
+            </div>
+            <div id="roomDetailContent"></div>
+        </div>
+    </div>
+
+    <!-- ===== BOOKING MODAL ===== -->
+    <div id="bookingModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">📋 Request to Book</h2>
+                <button onclick="closeBookingModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <form onsubmit="handleBookingRequest(event)">
+                <div class="space-y-3">
+                    <input type="date" id="moveInDate" required class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="number" id="stayDuration" placeholder="Expected duration (months)" required min="1" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="number" id="numPeople" placeholder="Number of people" required min="1" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <textarea id="bookingMessage" placeholder="Message to owner (e.g., I'm a student looking for..." rows="3" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500"></textarea>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-medium">
+                        <i class="fas fa-paper-plane mr-2"></i> Send Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== OWNER LISTING WIZARD ===== -->
+    <div id="listingWizard" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">🏠 List Your Room</h2>
+                <button onclick="closeListingWizard()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div id="wizardContent">
+                <!-- Step indicators -->
+                <div class="step-indicator" id="stepIndicator">
+                    <span class="step-dot active" data-step="1">1</span>
+                    <span class="step-dot" data-step="2">2</span>
+                    <span class="step-dot" data-step="3">3</span>
+                    <span class="step-dot" data-step="4">4</span>
+                    <span class="step-dot" data-step="5">5</span>
+                    <span class="step-dot" data-step="6">6</span>
+                    <span class="step-dot" data-step="7">7</span>
+                </div>
+                <div id="wizardSteps" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== TOAST CONTAINER ===== -->
+<div id="toastContainer"></div>
+
+<script>
+// ============================================
+// COMPLETE JAVASCRIPT APPLICATION
+// ============================================
+
+// ===== STATE =====
+const state = {
+    user: null,
+    rooms: [],
+    savedRooms: [],
+    messages: {},
+    currentPage: 'home',
+    currentRoom: null,
+    currentChat: null,
+    filters: { minRent: 0, maxRent: 100000, type: '', water: '' },
+    location: null,
+    listings: [],
+    currentStep: 1,
+    listingData: {},
+    uploadedPhotos: {
+        room: [],
+        bathroom: [],
+        kitchen: [],
+        water: []
+    },
+    bookingRequests: []
+};
+
+// ===== DEMO DATA =====
+const DEMO_ROOMS = [
+    {
+        id: 1,
+        title: "Furnished Student Room near College",
+        price: 5500,
+        type: "single",
+        location: "Near Motihari College, Motihari",
+        distance: "1.2 km",
+        city: "Motihari",
+        state: "Bihar",
+        pin: "845401",
+        availableFrom: "2026-10-01",
+        electricity: "₹8/unit",
+        water: "Included",
+        facilities: ["Wi-Fi", "Bed", "Table", "Chair", "Kitchen", "Water supply"],
+        images: ["https://picsum.photos/seed/room1/400/300", "https://picsum.photos/seed/room1b/400/300"],
+        owner: { name: "Rajesh Kumar", verified: true, since: "2025" },
+        description: "Comfortable single room with all basic amenities. Perfect for students.",
+        bathroom: "Attached",
+        kitchen: "Shared",
+        waterSystem: "24×7 Municipal Water",
+        occupants: 1,
+        deposit: 10000,
+        maintenance: 500,
+        electricityIncluded: false,
+        waterIncluded: true,
+        internetIncluded: false,
+        available: true,
+        views: 124
+    },
+    {
+        id: 2,
+        title: "Double Sharing PG with Food",
+        price: 7500,
+        type: "double",
+        location: "Sugauli Market, Sugauli",
+        distance: "2.8 km",
+        city: "Sugauli",
+        state: "Bihar",
+        pin: "845456",
+        availableFrom: "2026-09-15",
+        electricity: "Fixed ₹500/month",
+        water: "Included",
+        facilities: ["Wi-Fi", "AC", "Food", "Washing Machine", "Parking"],
+        images: ["https://picsum.photos/seed/pg1/400/300", "https://picsum.photos/seed/pg1b/400/300"],
+        owner: { name: "Priya Singh", verified: true, since: "2023" },
+        description: "Well-maintained PG with healthy food options. Near Sugauli bus stand.",
+        bathroom: "Common",
+        kitchen: "Common",
+        waterSystem: "Borewell + Tanker",
+        occupants: 2,
+        deposit: 15000,
+        maintenance: 1000,
+        electricityIncluded: false,
+        waterIncluded: true,
+        internetIncluded: true,
+        available: true,
+        views: 89
+    },
+    {
+        id: 3,
+        title: "1 BHK Flat for Working Professionals",
+        price: 12000,
+        type: "1bhk",
+        location: "Patna City Center, Patna",
+        distance: "4.5 km",
+        city: "Patna",
+        state: "Bihar",
+        pin: "800001",
+        availableFrom: "2026-10-05",
+        electricity: "₹10/unit",
+        water: "Limited Hours",
+        facilities: ["AC", "Refrigerator", "Geyser", "Balcony", "CCTV"],
+        images: ["https://picsum.photos/seed/flat1/400/300", "https://picsum.photos/seed/flat1b/400/300"],
+        owner: { name: "Amit Verma", verified: false, since: "2026" },
+        description: "Spacious 1 BHK in a secure gated society. Ideal for professionals.",
+        bathroom: "Attached",
+        kitchen: "Private",
+        waterSystem: "Limited Hours - Tank Water",
+        occupants: 2,
+        deposit: 25000,
+        maintenance: 1500,
+        electricityIncluded: false,
+        waterIncluded: false,
+        internetIncluded: false,
+        available: true,
+        views: 56
+    },
+    {
+        id: 4,
+        title: "Budget Triple Sharing Room",
+        price: 4000,
+        type: "triple",
+        location: "Near Railway Station, Motihari",
+        distance: "0.8 km",
+        city: "Motihari",
+        state: "Bihar",
+        pin: "845401",
+        availableFrom: "2026-09-20",
+        electricity: "₹6/unit",
+        water: "Morning/Evening",
+        facilities: ["Bed", "Fan", "Cupboard", "Water supply"],
+        images: ["https://picsum.photos/seed/budget/400/300", "https://picsum.photos/seed/budgetb/400/300"],
+        owner: { name: "Suresh Yadav", verified: true, since: "2024" },
+        description: "Budget-friendly room for students. Clean and safe environment.",
+        bathroom: "Common",
+        kitchen: "Common",
+        waterSystem: "Morning/Evening Water Supply",
+        occupants: 3,
+        deposit: 5000,
+        maintenance: 300,
+        electricityIncluded: false,
+        waterIncluded: false,
+        internetIncluded: false,
+        available: true,
+        views: 203
+    },
+    {
+        id: 5,
+        title: "PG for Girls with Food",
+        price: 8500,
+        type: "pg",
+        location: "Delhi University North Campus, Delhi",
+        distance: "6.2 km",
+        city: "Delhi",
+        state: "Delhi",
+        pin: "110007",
+        availableFrom: "2026-10-01",
+        electricity: "Included",
+        water: "24×7",
+        facilities: ["Wi-Fi", "AC", "Food", "Geyser", "Security", "CCTV"],
+        images: ["https://picsum.photos/seed/pggirls/400/300", "https://picsum.photos/seed/pggirlsb/400/300"],
+        owner: { name: "Mrs. Sharma", verified: true, since: "2022" },
+        description: "Safe and comfortable PG for girls. Homely food and 24/7 security.",
+        bathroom: "Attached",
+        kitchen: "Common",
+        waterSystem: "24×7 Municipal + Borewell",
+        occupants: 2,
+        deposit: 20000,
+        maintenance: 1000,
+        electricityIncluded: true,
+        waterIncluded: true,
+        internetIncluded: true,
+        available: true,
+        views: 167
+    },
+    {
+        id: 6,
+        title: "2 BHK Flat with Modern Amenities",
+        price: 18000,
+        type: "2bhk",
+        location: "Patna Boring Road, Patna",
+        distance: "7.8 km",
+        city: "Patna",
+        state: "Bihar",
+        pin: "800013",
+        availableFrom: "2026-09-25",
+        electricity: "₹12/unit",
+        water: "24×7",
+        facilities: ["Wi-Fi", "AC", "Refrigerator", "Washing Machine", "Parking", "Balcony", "Power Backup"],
+        images: ["https://picsum.photos/seed/bhk2/400/300", "https://picsum.photos/seed/bhk2b/400/300"],
+        owner: { name: "Dr. Naveen", verified: true, since: "2021" },
+        description: "Luxurious 2 BHK with all modern facilities. Near shopping complex.",
+        bathroom: "Attached",
+        kitchen: "Private",
+        waterSystem: "24×7 Municipal Water",
+        occupants: 4,
+        deposit: 40000,
+        maintenance: 2000,
+        electricityIncluded: false,
+        waterIncluded: true,
+        internetIncluded: true,
+        available: true,
+        views: 92
+    },
+    {
+        id: 7,
+        title: "Single Room with AC near Metro",
+        price: 9000,
+        type: "single",
+        location: "Kalkaji, Delhi",
+        distance: "3.2 km",
+        city: "Delhi",
+        state: "Delhi",
+        pin: "110019",
+        availableFrom: "2026-10-15",
+        electricity: "Included",
+        water: "24×7",
+        facilities: ["Wi-Fi", "AC", "Bed", "Cupboard", "Geyser"],
+        images: ["https://picsum.photos/seed/metro/400/300", "https://picsum.photos/seed/metrob/400/300"],
+        owner: { name: "Vikram Singh", verified: true, since: "2024" },
+        description: "Modern single room with AC, near metro station. Perfect for professionals.",
+        bathroom: "Attached",
+        kitchen: "Shared",
+        waterSystem: "24×7 Municipal Water",
+        occupants: 1,
+        deposit: 18000,
+        maintenance: 800,
+        electricityIncluded: true,
+        waterIncluded: true,
+        internetIncluded: true,
+        available: true,
+        views: 78
+    },
+    {
+        id: 8,
+        title: "Budget PG for Students",
+        price: 3500,
+        type: "pg",
+        location: "Kankarbagh, Patna",
+        distance: "1.8 km",
+        city: "Patna",
+        state: "Bihar",
+        pin: "800020",
+        availableFrom: "2026-10-01",
+        electricity: "₹7/unit",
+        water: "Morning/Evening",
+        facilities: ["Bed", "Fan", "Cupboard", "Water supply"],
+        images: ["https://picsum.photos/seed/budgetpg/400/300", "https://picsum.photos/seed/budgetpgb/400/300"],
+        owner: { name: "Ravi Kumar", verified: false, since: "2025" },
+        description: "Affordable PG for students. Near coaching centers and market.",
+        bathroom: "Common",
+        kitchen: "Common",
+        waterSystem: "Morning/Evening - Tank Water",
+        occupants: 2,
+        deposit: 5000,
+        maintenance: 200,
+        electricityIncluded: false,
+        waterIncluded: false,
+        internetIncluded: false,
+        available: true,
+        views: 156
+    }
+];
+
+// ===== INIT =====
+function init() {
+    state.rooms = DEMO_ROOMS;
+    renderRooms(state.rooms);
+    setupEventListeners();
+    checkSavedRooms();
+    console.log('🏠 NearestRoom initialized!');
+    console.log('📱 Find rooms near you - Made with ❤️');
+}
+
+// ===== RENDER ROOMS =====
+function renderRooms(rooms) {
+    const grid = document.getElementById('roomsGrid');
+    if (!grid) return;
+    
+    if (rooms.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-12">
+                <i class="fas fa-home text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">No rooms found matching your criteria</p>
+                <button onclick="resetFilters()" class="mt-4 text-blue-600 hover:underline">Reset filters</button>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = rooms.map(room => `
+        <div class="bg-white rounded-2xl shadow-card overflow-hidden cursor-pointer" onclick="openRoomDetail(${room.id})">
+            <div class="relative">
+                <img src="${room.images[0]}" alt="${room.title}" class="room-card-img" loading="lazy" />
+                <button onclick="event.stopPropagation(); toggleSaveRoom(${room.id})" 
+                        class="absolute top-3 right-3 bg-white rounded-full w-10 h-10 flex items-center justify-center shadow-md hover:bg-red-50 transition">
+                    <i class="${state.savedRooms.includes(room.id) ? 'fas' : 'far'} fa-heart text-${state.savedRooms.includes(room.id) ? 'red-500' : 'gray-400'}"></i>
+                </button>
+                <span class="absolute bottom-3 left-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                    <i class="fas fa-map-pin"></i> ${room.distance}
+                </span>
+                <span class="absolute top-3 left-3 bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    ${room.type.toUpperCase()}
+                </span>
+            </div>
+            <div class="p-4">
+                <div class="flex justify-between items-start">
+                    <h3 class="font-semibold text-lg truncate flex-1">${room.title}</h3>
+                    <span class="text-blue-600 font-bold">₹${room.price}/mo</span>
+                </div>
+                <p class="text-gray-500 text-sm"><i class="fas fa-location-dot text-gray-400 mr-1"></i>${room.location}</p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                    ${room.facilities.slice(0, 4).map(f => `
+                        <span class="facility-badge"><i class="fas fa-check text-green-500"></i>${f}</span>
+                    `).join('')}
+                    ${room.facilities.length > 4 ? `<span class="facility-badge">+${room.facilities.length - 4}</span>` : ''}
+                </div>
+                <div class="flex items-center gap-2 mt-3 pt-3 border-t">
+                    <span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">👤 ${room.occupants} person</span>
+                    <span class="text-xs text-gray-500"><i class="far fa-eye"></i> ${room.views}</span>
+                    ${room.owner.verified ? '<span class="text-xs text-green-500"><i class="fas fa-check-circle"></i> Verified</span>' : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ===== NAVIGATION =====
+function navigateTo(page) {
+    // Hide all pages
+    ['home', 'search', 'saved', 'messages', 'profile'].forEach(p => {
+        document.getElementById(p + 'Page').classList.add('hidden');
+    });
+    // Show target page
+    document.getElementById(page + 'Page').classList.remove('hidden');
+    
+    // Update nav
+    document.querySelectorAll('.bottom-nav-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.page === page);
+    });
+    
+    state.currentPage = page;
+    
+    // Render content based on page
+    if (page === 'saved') renderSavedRooms();
+    if (page === 'messages') renderMessages();
+    if (page === 'search') renderSearch();
+}
+
+// ===== AUTH =====
+function showAuthModal() {
+    document.getElementById('authModal').classList.add('show');
+}
+
+function closeAuthModal() {
+    document.getElementById('authModal').classList.remove('show');
+}
+
+function switchAuthForm(form) {
+    document.getElementById('loginForm').classList.toggle('hidden', form !== 'login');
+    document.getElementById('signupForm').classList.toggle('hidden', form !== 'signup');
+    document.getElementById('authTitle').textContent = form === 'login' ? 'Sign In' : 'Create Account';
+}
+
+function handleLogin(e) {
+    e.preventDefault();
+    showToast('Welcome back to NearestRoom! 🎉', 'success');
+    closeAuthModal();
+    state.user = { name: 'Demo User', email: 'demo@nearestroom.com', role: 'tenant' };
+    updateProfileUI();
+}
+
+function handleSignup(e) {
+    e.preventDefault();
+    showToast('Account created successfully! 🎉', 'success');
+    closeAuthModal();
+    state.user = { name: 'New User', email: 'user@nearestroom.com', role: 'tenant' };
+    updateProfileUI();
+}
+
+function updateProfileUI() {
+    if (state.user) {
+        document.getElementById('profileName').textContent = state.user.name || 'User';
+        document.getElementById('profileEmail').textContent = state.user.email || 'user@email.com';
+        // Show owner dashboard button if owner
+        if (state.user.role === 'owner') {
+            document.querySelector('[onclick="showOwnerDashboard()"]').style.display = 'block';
+        }
+    }
+}
+
+// ===== LOCATION =====
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                state.location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                document.getElementById('locationStatus').textContent = '📍 Location detected! Showing rooms near you.';
+                showToast('📍 Location detected successfully!', 'success');
+                filterRoomsByLocation();
+            },
+            (err) => {
+                document.getElementById('locationStatus').textContent = '⚠️ Could not detect location. Showing all rooms.';
+                showToast('⚠️ Could not detect location. Please allow location access.', 'error');
+            }
+        );
+    } else {
+        showToast('Geolocation not supported by your browser.', 'error');
+    }
+}
+
+function filterRoomsByLocation() {
+    // In a real app, this would sort by distance
+    // For demo, we'll just shuffle a bit
+    const shuffled = [...state.rooms].sort(() => Math.random() - 0.5);
+    renderRooms(shuffled);
+}
+
+// ===== SAVE ROOMS =====
+function toggleSaveRoom(roomId) {
+    const idx = state.savedRooms.indexOf(roomId);
+    if (idx > -1) {
+        state.savedRooms.splice(idx, 1);
+        showToast('Removed from saved ❌', 'info');
+    } else {
+        state.savedRooms.push(roomId);
+        showToast('Saved! ❤️', 'success');
+    }
+    updateSaveBadge();
+    renderRooms(state.rooms);
+}
+
+function checkSavedRooms() {
+    // Load from localStorage
+    const saved = localStorage.getItem('savedRooms');
+    if (saved) state.savedRooms = JSON.parse(saved);
+    updateSaveBadge();
+}
+
+function updateSaveBadge() {
+    const badge = document.getElementById('savedBadge');
+    if (state.savedRooms.length > 0) {
+        badge.textContent = state.savedRooms.length;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+    localStorage.setItem('savedRooms', JSON.stringify(state.savedRooms));
+}
+
+function renderSavedRooms() {
+    const grid = document.getElementById('savedGrid');
+    const saved = state.rooms.filter(r => state.savedRooms.includes(r.id));
+    if (saved.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full text-center py-12">
+                <i class="fas fa-heart text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">No saved rooms yet</p>
+                <p class="text-sm text-gray-400">💡 Start exploring and save rooms you like</p>
+            </div>
+        `;
+        return;
+    }
+    grid.innerHTML = saved.map(room => `
+        <div class="bg-white rounded-2xl shadow-card overflow-hidden cursor-pointer" onclick="openRoomDetail(${room.id})">
+            <div class="relative">
+                <img src="${room.images[0]}" alt="${room.title}" class="room-card-img" loading="lazy" />
+                <button onclick="event.stopPropagation(); toggleSaveRoom(${room.id})" 
+                        class="absolute top-3 right-3 bg-white rounded-full w-10 h-10 flex items-center justify-center shadow-md">
+                    <i class="fas fa-heart text-red-500"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <h3 class="font-semibold">${room.title}</h3>
+                <p class="text-blue-600 font-bold">₹${room.price}/mo</p>
+                <p class="text-gray-500 text-sm"><i class="fas fa-location-dot mr-1"></i>${room.location}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ===== ROOM DETAIL =====
+function openRoomDetail(roomId) {
+    const room = state.rooms.find(r => r.id === roomId);
+    if (!room) return;
+    state.currentRoom = room;
+    
+    const content = document.getElementById('roomDetailContent');
+    content.innerHTML = `
+        <div class="space-y-4">
+            <!-- Image Gallery -->
+            <div class="flex gap-2 overflow-x-auto pb-2">
+                ${room.images.map(img => `
+                    <img src="${img}" class="w-32 h-32 object-cover rounded-xl flex-shrink-0" loading="lazy" />
+                `).join('')}
+                <div class="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 flex-shrink-0">
+                    <i class="fas fa-camera text-2xl"></i>
+                </div>
+            </div>
+            
+            <h2 class="text-2xl font-bold">${room.title}</h2>
+            <div class="flex items-center gap-2">
+                <span class="text-2xl font-bold text-blue-600">₹${room.price}</span>
+                <span class="text-gray-500">/month</span>
+            </div>
+            
+            <div class="flex items-center gap-2 text-gray-600">
+                <i class="fas fa-location-dot text-blue-500"></i>
+                <span>${room.location}</span>
+                <span class="bg-blue-50 px-2 py-0.5 rounded-full text-xs">${room.distance}</span>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <span class="text-gray-500">Available</span>
+                    <div class="font-semibold">${room.availableFrom}</div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <span class="text-gray-500">Occupants</span>
+                    <div class="font-semibold">${room.occupants} person${room.occupants > 1 ? 's' : ''}</div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <span class="text-gray-500">Deposit</span>
+                    <div class="font-semibold">₹${room.deposit}</div>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <span class="text-gray-500">Maintenance</span>
+                    <div class="font-semibold">₹${room.maintenance}</div>
+                </div>
+            </div>
+            
+            <!-- Pricing Details -->
+            <div class="border-t pt-3">
+                <h4 class="font-semibold mb-2">💰 Pricing Details</h4>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div><span class="text-gray-500">Electricity:</span> ${room.electricity}</div>
+                    <div><span class="text-gray-500">Water:</span> ${room.water}</div>
+                    <div><span class="text-gray-500">Internet:</span> ${room.internetIncluded ? '✅ Included' : '❌ Not included'}</div>
+                    <div><span class="text-gray-500">Bathroom:</span> ${room.bathroom}</div>
+                    <div><span class="text-gray-500">Kitchen:</span> ${room.kitchen}</div>
+                    <div><span class="text-gray-500">Water System:</span> ${room.waterSystem}</div>
+                </div>
+            </div>
+            
+            <!-- Facilities -->
+            <div class="border-t pt-3">
+                <h4 class="font-semibold mb-2">🛠️ Facilities</h4>
+                <div class="flex flex-wrap gap-2">
+                    ${room.facilities.map(f => `
+                        <span class="facility-badge"><i class="fas fa-check text-green-500"></i>${f}</span>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- Description -->
+            <div class="border-t pt-3">
+                <h4 class="font-semibold mb-1">📝 Description</h4>
+                <p class="text-gray-600 text-sm">${room.description}</p>
+            </div>
+            
+            <!-- Owner -->
+            <div class="border-t pt-3 flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                    ${room.owner.name.charAt(0)}
+                </div>
+                <div>
+                    <div class="font-semibold">${room.owner.name}</div>
+                    <div class="text-xs text-gray-500">Member since ${room.owner.since}</div>
+                    ${room.owner.verified ? '<span class="text-xs text-green-600"><i class="fas fa-check-circle"></i> Verified</span>' : '<span class="text-xs text-gray-400">⚠️ Unverified</span>'}
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex gap-2 pt-2">
+                <button onclick="openChatWithOwner('${room.owner.name}')" class="flex-1 bg-blue-50 text-blue-600 py-3 rounded-xl font-medium hover:bg-blue-100 transition">
+                    <i class="fas fa-comment mr-2"></i> Message
+                </button>
+                <button onclick="openBookingModal(${room.id})" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition">
+                    <i class="fas fa-calendar-check mr-2"></i> Request
+                </button>
+            </div>
+            
+            <!-- Safety Warning -->
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                <i class="fas fa-shield mr-2"></i>
+                ⚠️ Never send money before verifying the property. Report suspicious listings.
+                <button onclick="reportListing(${room.id})" class="text-red-600 underline ml-2">Report</button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('roomDetailModal').classList.add('show');
+}
+
+function closeRoomDetail() {
+    document.getElementById('roomDetailModal').classList.remove('show');
+}
+
+function toggleSave() {
+    if (state.currentRoom) {
+        toggleSaveRoom(state.currentRoom.id);
+        const btn = document.getElementById('saveBtn');
+        const isSaved = state.savedRooms.includes(state.currentRoom.id);
+        btn.innerHTML = `<i class="${isSaved ? 'fas' : 'far'} fa-heart"></i>`;
+    }
+}
+
+// ===== BOOKING =====
+function openBookingModal(roomId) {
+    if (!state.user) {
+        showToast('Please sign in to book a room', 'error');
+        showAuthModal();
+        return;
+    }
+    document.getElementById('bookingModal').classList.add('show');
+    document.getElementById('bookingModal').dataset.roomId = roomId;
+}
+
+function closeBookingModal() {
+    document.getElementById('bookingModal').classList.remove('show');
+}
+
+function handleBookingRequest(e) {
+    e.preventDefault();
+    const roomId = parseInt(document.getElementById('bookingModal').dataset.roomId);
+    const moveIn = document.getElementById('moveInDate').value;
+    const duration = document.getElementById('stayDuration').value;
+    const people = document.getElementById('numPeople').value;
+    const message = document.getElementById('bookingMessage').value;
+    
+    if (!moveIn || !duration || !people) {
+        showToast('Please fill all required fields', 'error');
+        return;
+    }
+    
+    showToast('✅ Booking request sent to owner!', 'success');
+    closeBookingModal();
+    
+    state.bookingRequests.push({
+        roomId,
+        moveIn,
+        duration,
+        people,
+        message,
+        status: 'pending',
+        date: new Date().toISOString()
+    });
+    
+    e.target.reset();
+}
+
+// ===== MESSAGES =====
+function openChatWithOwner(ownerName) {
+    navigateTo('messages');
+    document.getElementById('chatView').classList.remove('hidden');
+    document.getElementById('chatPartnerName').textContent = ownerName;
+    document.getElementById('conversationsList').classList.add('hidden');
+    state.currentChat = ownerName;
+    
+    const messages = document.getElementById('chatMessages');
+    messages.innerHTML = `
+        <div class="message-bubble received">👋 Hello! I'm interested in your room.</div>
+        <div class="message-bubble sent">Hi! Yes, the room is still available.</div>
+        <div class="message-bubble received">Can I visit tomorrow?</div>
+        <div class="message-bubble sent">Sure! What time works for you?</div>
+    `;
+}
+
+function closeChat() {
+    document.getElementById('chatView').classList.add('hidden');
+    document.getElementById('conversationsList').classList.remove('hidden');
+}
+
+function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    
+    const messages = document.getElementById('chatMessages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message-bubble sent';
+    msgDiv.textContent = text;
+    messages.appendChild(msgDiv);
+    input.value = '';
+    messages.scrollTop = messages.scrollHeight;
+    
+    setTimeout(() => {
+        const reply = document.createElement('div');
+        reply.className = 'message-bubble received';
+        reply.textContent = '👍 Thanks for your message! I\'ll get back to you soon.';
+        messages.appendChild(reply);
+        messages.scrollTop = messages.scrollHeight;
+    }, 1000);
+}
+
+function renderMessages() {
+    const list = document.getElementById('conversationsList');
+    if (state.bookingRequests.length === 0) {
+        list.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-comment-dots text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">No conversations yet</p>
+                <p class="text-sm text-gray-400">💬 Message owners about rooms you like</p>
+            </div>
+        `;
+        return;
+    }
+    
+    list.innerHTML = state.bookingRequests.map(req => {
+        const room = state.rooms.find(r => r.id === req.roomId);
+        return `
+            <div class="bg-white rounded-2xl shadow-card p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50" 
+                 onclick="openChatWithOwner('${room ? room.owner.name : 'Owner'}')">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                    ${room ? room.owner.name.charAt(0) : 'O'}
+                </div>
+                <div class="flex-1">
+                    <div class="font-semibold">${room ? room.owner.name : 'Owner'}</div>
+                    <div class="text-sm text-gray-500">${room ? room.title : 'Room'}</div>
+                    <div class="text-xs ${req.status === 'pending' ? 'text-amber-500' : 'text-green-500'}">
+                        ${req.status === 'pending' ? '⏳ Pending' : '✅ Accepted'}
+                    </div>
+                </div>
+                <div class="text-xs text-gray-400">${new Date(req.date).toLocaleDateString()}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ===== SEARCH & FILTERS =====
+function applyFilters() {
+    const minRent = parseInt(document.getElementById('minRent').value) || 0;
+    const maxRent = parseInt(document.getElementById('maxRent').value) || 100000;
+    const type = document.getElementById('roomTypeFilter').value;
+    const water = document.getElementById('waterFilter').value;
+    const wifi = document.getElementById('fWifi').checked;
+    const ac = document.getElementById('fAc').checked;
+    const parking = document.getElementById('fParking').checked;
+    const kitchen = document.getElementById('fKitchen').checked;
+    const food = document.getElementById('fFood').checked;
+    
+    let filtered = state.rooms.filter(room => {
+        if (room.price < minRent || room.price > maxRent) return false;
+        if (type && room.type !== type) return false;
+        if (water && !room.water.includes(water)) return false;
+        if (wifi && !room.facilities.includes('Wi-Fi')) return false;
+        if (ac && !room.facilities.includes('AC')) return false;
+        if (parking && !room.facilities.includes('Parking')) return false;
+        if (kitchen && !room.facilities.includes('Kitchen')) return false;
+        if (food && !room.facilities.includes('Food')) return false;
+        return true;
+    });
+    
+    navigateTo('search');
+    const results = document.getElementById('searchResults');
+    if (filtered.length === 0) {
+        results.innerHTML = `
+            <div class="col-span-full text-center py-12">
+                <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">No rooms match your filters</p>
+                <button onclick="resetFilters()" class="mt-4 text-blue-600 hover:underline">Reset filters</button>
+            </div>
+        `;
+        return;
+    }
+    
+    results.innerHTML = filtered.map(room => `
+        <div class="bg-white rounded-2xl shadow-card overflow-hidden cursor-pointer" onclick="openRoomDetail(${room.id})">
+            <div class="relative">
+                <img src="${room.images[0]}" alt="${room.title}" class="room-card-img" loading="lazy" />
+                <span class="absolute bottom-3 left-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
+                    ${room.distance}
+                </span>
+            </div>
+            <div class="p-4">
+                <h3 class="font-semibold text-lg truncate">${room.title}</h3>
+                <p class="text-blue-600 font-bold">₹${room.price}/mo</p>
+                <p class="text-gray-500 text-sm"><i class="fas fa-location-dot mr-1"></i>${room.location}</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+function resetFilters() {
+    document.getElementById('minRent').value = '';
+    document.getElementById('maxRent').value = '';
+    document.getElementById('roomTypeFilter').value = '';
+    document.getElementById('waterFilter').value = '';
+    document.getElementById('fWifi').checked = false;
+    document.getElementById('fAc').checked = false;
+    document.getElementById('fParking').checked = false;
+    document.getElementById('fKitchen').checked = false;
+    document.getElementById('fFood').checked = false;
+    applyFilters();
+}
+
+function renderSearch() {
+    applyFilters();
+}
+
+// ===== OWNER DASHBOARD =====
+function showOwnerDashboard() {
+    if (!state.user) {
+        showToast('Please sign in as an owner', 'error');
+        showAuthModal();
+        return;
+    }
+    showToast('🏠 Owner Dashboard - Manage your listings', 'info');
+    openListingWizard();
+}
+
+// ===== LISTING WIZARD =====
+function openListingWizard() {
+    if (!state.user) {
+        showToast('Please sign in as an owner to list a room', 'error');
+        showAuthModal();
+        return;
+    }
+    document.getElementById('listingWizard').classList.add('show');
+    state.currentStep = 1;
+    state.uploadedPhotos = { room: [], bathroom: [], kitchen: [], water: [] };
+    renderWizardStep(1);
+}
+
+function closeListingWizard() {
+    document.getElementById('listingWizard').classList.remove('show');
+}
+
+function renderWizardStep(step) {
+    const container = document.getElementById('wizardSteps');
+    document.querySelectorAll('.step-dot').forEach(dot => {
+        const num = parseInt(dot.dataset.step);
+        dot.classList.remove('active', 'completed');
+        if (num === step) dot.classList.add('active');
+        else if (num < step) dot.classList.add('completed');
+    });
+    
+    let html = '';
+    switch(step) {
+        case 1:
+            html = `
+                <h3 class="font-semibold text-lg mb-3">📝 Step 1: Basic Information</h3>
+                <div class="space-y-3">
+                    <input type="text" id="wizTitle" placeholder="Room Title (e.g., Cozy Single Room)" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <select id="wizType" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500">
+                        <option value="">Room Type</option>
+                        <option value="single">Single Room</option>
+                        <option value="double">Double Sharing</option>
+                        <option value="triple">Triple Sharing</option>
+                        <option value="pg">PG</option>
+                        <option value="1bhk">1 BHK</option>
+                        <option value="2bhk">2 BHK</option>
+                        <option value="shared">Shared Room</option>
+                        <option value="hostel">Hostel-style</option>
+                    </select>
+                    <input type="number" id="wizOccupants" placeholder="Number of occupants allowed" min="1" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="date" id="wizAvailable" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <button onclick="nextStep(2)" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition">
+                        Next <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            `;
+            break;
+        case 2:
+            html = `
+                <h3 class="font-semibold text-lg mb-3">📍 Step 2: Location</h3>
+                <div class="space-y-3">
+                    <input type="text" id="wizAddress" placeholder="Full address" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="text" id="wizLocality" placeholder="Locality/Area" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="text" id="wizCity" placeholder="City" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="text" id="wizState" placeholder="State" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="text" id="wizPin" placeholder="PIN Code" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <div class="flex gap-2">
+                        <button onclick="prevStep(1)" class="flex-1 bg-gray-100 py-3 rounded-xl hover:bg-gray-200 transition">
+                            <i class="fas fa-arrow-left mr-2"></i> Back
+                        </button>
+                        <button onclick="nextStep(3)" class="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition">
+                            Next <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            break;
+        case 3:
+            html = `
+                <h3 class="font-semibold text-lg mb-3">💰 Step 3: Pricing</h3>
+                <div class="space-y-3">
+                    <input type="number" id="wizRent" placeholder="Monthly rent (₹)" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="number" id="wizDeposit" placeholder="Security deposit (₹)" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <input type="number" id="wizMaintenance" placeholder="Maintenance charge (₹)" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">⚡ Electricity included?</span>
+                        <label class="flex items-center gap-1"><input type="radio" name="elecInc" value="yes" /> Yes</label>
+                        <label class="flex items-center gap-1"><input type="radio" name="elecInc" value="no" checked /> No</label>
+                    </div>
+                    <input type="text" id="wizElectricity" placeholder="Electricity: ₹8/unit or Fixed ₹500" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500" />
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium">💧 Water included?</span>
+                        <label class="flex items-center gap-1"><input type="radio" name="waterInc" value="yes" checked /> Yes</label>
+                        <label class="flex items-center gap-1"><input type="radio" name="waterInc" value="no" /> No</label>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="prevStep(2)" class="flex-1 bg-gray-100 py-3 rounded-xl hover:bg-gray-200 transition">
+                            <i class="fas fa-arrow-left mr-2"></i> Back
+                        </button>
+                        <button onclick="nextStep(4)" class="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition">
+                            Next <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            break;
+        case 4:
+            html = `
+                <h3 class="font-semibold text-lg mb-3">🛠️ Step 4: Facilities</h3>
+                <div class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                    ${['Wi-Fi','Bed','Mattress','Table','Chair','Cupboard','Fan','AC','Cooler','Refrigerator','Washing machine','Parking','CCTV','Security','Power backup','Water supply','Attached bathroom','Common bathroom','Kitchen','Balcony','Laundry','Food available','Geyser'].map(f => `
+                        <label class="flex items-center gap-2 text-sm p-1 hover:bg-gray-50 rounded">
+                            <input type="checkbox" value="${f}" class="facility-check" /> ${f}
+                        </label>
+                    `).join('')}
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button onclick="prevStep(3)" class="flex-1 bg-gray-100 py-3 rounded-xl hover:bg-gray-200 transition">
+                        <i class="fas fa-arrow-left mr-2"></i> Back
+                    </button>
+                    <button onclick="nextStep(5)" class="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition">
+                        Next <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            `;
+            break;
+        case 5:
+            html = `
+                <h3 class="font-semibold text-lg mb-3">📸 Step 5: Photos</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="font-medium text-sm">🛏️ Room Photos (3-5 required)</div>
+                        <div class="upload-zone" onclick="document.getElementById('roomUpload').click()">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-blue-500"></i>
+                            <p class="text-gray-500 mt-2">Click to upload room photos</p>
+                            <input type="file" id="roomUpload" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event, 'room')" />
+                        </div>
+                        <div id="roomPreview" class="image-grid"></div>
+                        <div class="text-sm mt-1" id="roomStatus">🛏️ Room: 0/3 minimum</div>
+                    </div>
+                    <div>
+                        <div class="font-medium text-sm">🚿 Bathroom Photo (1 required)</div>
+                        <div class="upload-zone" onclick="document.getElementById('bathroomUpload').click()">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-blue-500"></i>
+                            <p class="text-gray-500 mt-2">Click to upload bathroom photo</p>
+                            <input type="file" id="bathroomUpload" accept="image/*" class="hidden" onchange="handlePhotoUpload(event, 'bathroom')" />
+                        </div>
+                        <div id="bathroomPreview" class="image-grid"></div>
+                        <div class="text-sm mt-1" id="bathroomStatus">🚿 Bathroom: 0/1</div>
+                    </div>
+                    <div>
+                        <div class="font-medium text-sm">🍳 Kitchen Photo (1 required)</div>
+                        <div class="upload-zone" onclick="document.getElementById('kitchenUpload').click()">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-blue-500"></i>
+                            <p class="text-gray-500 mt-2">Click to upload kitchen photo</p>
+                            <input type="file" id="kitchenUpload" accept="image/*" class="hidden" onchange="handlePhotoUpload(event, 'kitchen')" />
+                        </div>
+                        <div id="kitchenPreview" class="image-grid"></div>
+                        <div class="text-sm mt-1" id="kitchenStatus">🍳 Kitchen: 0/1</div>
+                    </div>
+                    <div>
+                        <div class="font-medium text-sm">💧 Water System Photo (1 required)</div>
+                        <div class="upload-zone" onclick="document.getElementById('waterUpload').click()">
+                            <i class="fas fa-cloud-upload-alt text-3xl text-blue-500"></i>
+                            <p class="text-gray-500 mt-2">Click to upload water system photo</p>
+                            <input type="file" id="waterUpload" accept="image/*" class="hidden" onchange="handlePhotoUpload(event, 'water')" />
+                        </div>
+                        <div id="waterPreview" class="image-grid"></div>
+                        <div class="text-sm mt-1" id="waterStatus">💧 Water: 0/1</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="prevStep(4)" class="flex-1 bg-gray-100 py-3 rounded-xl hover:bg-gray-200 transition">
+                            <i class="fas fa-arrow-left mr-2"></i> Back
+                        </button>
+                        <button onclick="nextStep(6)" class="flex-1 bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition">
+                            Next <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            break;
+        case 6:
+            html = `
+                <h3 class="font-semibold text-lg mb-3">📋 Step 6: Review</h3>
+                <div class="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                    <p><strong>Title:</strong> ${document.getElementById('wizTitle')?.value || 'Not set'}</p>
+                    <p><strong>Type:</strong> ${document.getElementById('wizType')?.value || 'Not set'}</p>
+                    <p><strong>City:</strong> ${document.getElementById('wizCity')?.value || 'Not set'}</p>
+                    <p><strong>Rent:</strong> ₹${document.getElementById('wizRent')?.value || '0'}/month</p>
+                    <p><strong>Facilities:</strong> ${document.querySelectorAll('.facility-check:checked').length} selected</p>
+                    <p><strong>Photos:</strong> Room ${state.uploadedPhotos.room.length}/3+, Bathroom ${state.uploadedPhotos.bathroom.length}/1, Kitchen ${state.uploadedPhotos.kitchen.length}/1, Water ${state.uploadedPhotos.water.length}/1</p>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button onclick="prevStep(5)" class="flex-1 bg-gray-100 py-3 rounded-xl hover:bg-gray-200 transition">
+                        <i class="fas fa-arrow-left mr-2"></i> Back
+                    </button>
+                    <button onclick="publishListing()" class="flex-1 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 transition">
+                        <i class="fas fa-check mr-2"></i> Publish
+                    </button>
+                </div>
+            `;
+            break;
+    }
+    container.innerHTML = html;
+}
+
+function nextStep(step) {
+    // Validate photo requirements before step 6
+    if (step === 6) {
+        const roomCount = state.uploadedPhotos.room.length;
+        const bathCount = state.uploadedPhotos.bathroom.length;
+        const kitchenCount = state.uploadedPhotos.kitchen.length;
+        const waterCount = state.uploadedPhotos.water.length;
+        
+        if (roomCount < 3) {
+            showToast(`Please upload at least ${3 - roomCount} more room photos`, 'error');
+            return;
+        }
+        if (bathCount < 1) {
+            showToast('Please upload a bathroom photo', 'error');
+            return;
+        }
+        if (kitchenCount < 1) {
+            showToast('Please upload a kitchen photo', 'error');
+            return;
+        }
+        if (waterCount < 1) {
+            showToast('Please upload a water system photo', 'error');
+            return;
+        }
+    }
+    
+    state.currentStep = step;
+    renderWizardStep(step);
+}
+
+function prevStep(step) {
+    state.currentStep = step;
+    renderWizardStep(step);
+}
+
+function handlePhotoUpload(event, type) {
+    const files = event.target.files;
+    if (!files.length) return;
+    
+    for (let file of files) {
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Image too large (max 5MB)', 'error');
+            continue;
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            state.uploadedPhotos[type].push(e.target.result);
+            updatePhotoPreview(type);
+        };
+        reader.readAsDataURL(file);
+    }
+    event.target.value = '';
+}
+
+function updatePhotoPreview(type) {
+    const container = document.getElementById(type + 'Preview');
+    if (!container) return;
+    
+    container.innerHTML = state.uploadedPhotos[type].map((src, idx) => `
+        <div class="image-thumb">
+            <img src="${src}" alt="${type} photo ${idx+1}" loading="lazy" />
+            <button class="remove-btn" onclick="removePhoto('${type}', ${idx})">×</button>
+        </div>
+    `).join('');
+    
+    const statusEl = document.getElementById(type + 'Status');
+    if (statusEl) {
+        const count = state.uploadedPhotos[type].length;
+        const min = type === 'room' ? 3 : 1;
+        const emojis = { room: '🛏️', bathroom: '🚿', kitchen: '🍳', water: '💧' };
+        statusEl.textContent = `${emojis[type] || ''} ${type.charAt(0).toUpperCase()+type.slice(1)}: ${count}/${min}${type === 'room' ? '+' : ''}`;
+        statusEl.style.color = count >= min ? '#10b981' : '#ef4444';
+    }
+}
+
+function removePhoto(type, index) {
+    state.uploadedPhotos[type].splice(index, 1);
+    updatePhotoPreview(type);
+}
+
+function publishListing() {
+    const title = document.getElementById('wizTitle')?.value;
+    const type = document.getElementById('wizType')?.value;
+    const occupants = parseInt(document.getElementById('wizOccupants')?.value) || 1;
+    const available = document.getElementById('wizAvailable')?.value || new Date().toISOString().split('T')[0];
+    const address = document.getElementById('wizAddress')?.value || '';
+    const locality = document.getElementById('wizLocality')?.value || '';
+    const city = document.getElementById('wizCity')?.value || '';
+    const state_ = document.getElementById('wizState')?.value || '';
+    const pin = document.getElementById('wizPin')?.value || '';
+    const rent = parseInt(document.getElementById('wizRent')?.value) || 0;
+    const deposit = parseInt(document.getElementById('wizDeposit')?.value) || 0;
+    const maintenance = parseInt(document.getElementById('wizMaintenance')?.value) || 0;
+    const electricity = document.getElementById('wizElectricity')?.value || 'Not specified';
+    const elecInc = document.querySelector('input[name="elecInc"]:checked')?.value === 'yes';
+    const waterInc = document.querySelector('input[name="waterInc"]:checked')?.value === 'yes';
+    
+    const facilities = Array.from(document.querySelectorAll('.facility-check:checked')).map(cb => cb.value);
+    
+    if (!title || !type || !city || rent < 1) {
+        showToast('Please fill all required fields', 'error');
+        return;
+    }
+    
+    const newRoom = {
+        id: state.rooms.length + 100,
+        title,
+        type,
+        price: rent,
+        location: `${locality || city}, ${city}`,
+        distance: '0.5 km',
+        city,
+        state: state_,
+        pin,
+        availableFrom: available,
+        electricity: electricity,
+        water: waterInc ? 'Included' : 'Not included',
+        facilities: facilities.length > 0 ? facilities : ['Basic amenities'],
+        images: state.uploadedPhotos.room.length > 0 ? state.uploadedPhotos.room : ['https://picsum.photos/seed/newroom/400/300'],
+        owner: { name: state.user?.name || 'Owner', verified: false, since: '2026' },
+        description: `${type} room in ${city} with ${facilities.length} amenities`,
+        bathroom: 'Attached',
+        kitchen: 'Private',
+        waterSystem: '24×7 Water',
+        occupants: occupants,
+        deposit: deposit,
+        maintenance: maintenance,
+        electricityIncluded: elecInc,
+        waterIncluded: waterInc,
+        internetIncluded: facilities.includes('Wi-Fi'),
+        available: true,
+        views: 0
+    };
+    
+    state.rooms.unshift(newRoom);
+    showToast('🎉 Your room has been published on NearestRoom!', 'success');
+    closeListingWizard();
+    renderRooms(state.rooms);
+    navigateTo('home');
+}
+
+// ===== ADMIN PANEL =====
+function showAdminPanel() {
+    const stats = `
+📊 NearestRoom Admin Dashboard
+━━━━━━━━━━━━━━━━━━━━━━━━
+Total Users: 2,847
+Total Owners: 423
+Total Listings: ${state.rooms.length}
+Available Rooms: ${state.rooms.filter(r => r.available).length}
+Rented Rooms: ${state.rooms.filter(r => !r.available).length}
+Pending Reports: 3
+Total Views: ${state.rooms.reduce((sum, r) => sum + r.views, 0)}
+
+[1] View All Users
+[2] View All Listings
+[3] Review Reports
+[4] Manage Categories
+[5] View Bookings
+    `;
+    alert(stats);
+}
+
+// ===== REPORT =====
+function reportListing(roomId) {
+    if (confirm('🚨 Report this listing for suspicious content?')) {
+        showToast('✅ Report submitted. Our team will review it.', 'success');
+    }
+}
+
+// ===== TOAST SYSTEM =====
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <div class="flex items-center gap-2">
+            <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+            ${message}
+        </div>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// ===== SETUP =====
+function setupEventListeners() {
+    document.getElementById('searchInput')?.addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        if (query.length > 1) {
+            const filtered = state.rooms.filter(r => 
+                r.title.toLowerCase().includes(query) || 
+                r.location.toLowerCase().includes(query) ||
+                r.city.toLowerCase().includes(query)
+            );
+            renderRooms(filtered);
+        } else if (query.length === 0) {
+            renderRooms(state.rooms);
+        }
+    });
+    
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            const filter = this.dataset.filter;
+            if (filter === 'all') {
+                renderRooms(state.rooms);
+                return;
+            }
+            const filtered = state.rooms.filter(r => {
+                if (filter === 'single') return r.type === 'single' || r.type === '1bhk' || r.type === '2bhk';
+                if (filter === 'shared') return r.type === 'double' || r.type === 'triple' || r.type === 'shared';
+                if (filter === 'pg') return r.type === 'pg' || r.type === 'hostel';
+                if (filter === 'bhk') return r.type === '1bhk' || r.type === '2bhk';
+                if (filter === 'wifi') return r.facilities.includes('Wi-Fi');
+                if (filter === 'ac') return r.facilities.includes('AC');
+                if (filter === 'food') return r.facilities.includes('Food');
+                return true;
+            });
+            renderRooms(filtered);
+        });
+    });
+    
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('show');
+            }
+        });
+    });
+}
+
+function loadMoreRooms() {
+    showToast('Loading more rooms...', 'info');
+    setTimeout(() => {
+        showToast('All rooms loaded!', 'success');
+    }, 1000);
+}
+
+function toggleTheme() {
+    document.body.classList.toggle('dark');
+    const icon = document.querySelector('.fa-moon');
+    if (icon) {
+        icon.classList.toggle('fa-moon');
+        icon.classList.toggle('fa-sun');
+    }
+    if (document.body.classList.contains('dark')) {
+        document.body.style.background = '#1a1a2e';
+        document.body.style.color = '#e2e8f0';
+    } else {
+        document.body.style.background = '#f0f2f5';
+        document.body.style.color = '#1f2937';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
